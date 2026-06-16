@@ -4,37 +4,56 @@ import conmysql from '../db.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
+export const registrar = async (req, res) => {
+    try {
+        const { nombre, email, password } = req.body;
+
+        const [existe] = await conmysql.query(
+            'SELECT * FROM usuarios WHERE email = ?', [email]
+        );
+        if (existe.length > 0) {
+            return res.status(400).json({ message: 'El email ya está registrado' });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        await conmysql.query(
+            'INSERT INTO usuarios (nombre, email, password) VALUES (?, ?, ?)',
+            [nombre, email, passwordHash]
+        );
+
+        return res.status(201).json({ message: 'Usuario registrado correctamente' });
+    } catch (error) {
+        return res.status(500).json({ message: 'Error al registrar usuario', error });
+    }
+};
+
 export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // 1. Buscamos al usuario por su email
-        const [rows] = await conmysql.query('SELECT * FROM usuarios WHERE email = ?', [email]);
-        
-        if (rows.length === 0) {
-            return res.status(401).json({ message: 'Correo o contraseña incorrectos' });
+        const [result] = await conmysql.query(
+            'SELECT * FROM usuarios WHERE email = ?', [email]
+        );
+        if (result.length === 0) {
+            return res.status(401).json({ message: 'Credenciales incorrectas' });
         }
 
-        const usuario = rows[0];
+        const usuario = result[0];
+        const passwordValida = await bcrypt.compare(password, usuario.password);
 
-        // 2. Comparamos la contraseña encriptada con bcrypt
-        const match = await bcrypt.compare(password, usuario.password);
-        if (!match) {
-            return res.status(401).json({ message: 'Correo o contraseña incorrectos' });
+        if (!passwordValida) {
+            return res.status(401).json({ message: 'Credenciales incorrectas' });
         }
 
-        // 3. Clave secreta (usa la variable de Railway, o una por defecto para que NO rompa con 500)
-        const secretKey = process.env.JWT_SECRET || 'clave_secreta_de_emergencia_123';
-
-        // 4. Generamos el token JWT
         const token = jwt.sign(
-            { id: usuario.id, email: usuario.email }, 
-            secretKey, 
-            { expiresIn: '8h' }
+            { id: usuario.id, email: usuario.email },
+            process.env.JWT_SECRET,
+            { expiresIn: '2h' }
         );
 
-        // 5. Enviamos la respuesta exacta que tu frontend de Ionic espera
         return res.json({
+            message: 'Login exitoso',
             token,
             usuario: {
                 id: usuario.id,
@@ -42,9 +61,7 @@ export const login = async (req, res) => {
                 email: usuario.email
             }
         });
-
     } catch (error) {
-        console.error("Error en login:", error);
-        return res.status(500).json({ message: 'Error interno del servidor' });
+        return res.status(500).json({ message: 'Error en el login', error });
     }
 };
