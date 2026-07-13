@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.routes.js';
 import productosRoutes from './routes/productos.routes.js';
 import clientesRoutes from './routes/clientes.routes.js';
+import pedidosRoutes from './routes/pedidos.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,5 +24,7 @@ app.use('/uploads', express.static(uploadsPath));
 app.use('/api', authRoutes);
 app.use('/api', productosRoutes);
 app.use('/api', clientesRoutes);
+app.use('/api', pedidosRoutes);
+
 
 export default app;
